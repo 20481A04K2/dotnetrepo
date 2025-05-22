@@ -6,6 +6,7 @@ steps:
     args:
       - '-c'
       - |
+        apt-get update && apt-get install -y zip
         mkdir -p output
         dotnet publish MyApp.csproj -c Release -o output
         zip -r dotnet_app.zip output
