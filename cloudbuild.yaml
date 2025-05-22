@@ -10,7 +10,7 @@ steps:
         dotnet publish MyApp.csproj -c Release -o output
         zip -r dotnet_app.zip output
 
-  # Step 2: Create startup script to unzip and run the app
+  # Step 2: Generate startup script to install runtime, unzip, and run app via systemd
   - name: 'ubuntu'
     id: 'Generate startup script'
     entrypoint: 'bash'
@@ -24,19 +24,19 @@ steps:
         sudo apt-get update
         sudo apt-get install -y unzip dotnet-runtime-7.0
 
-        unzip /home/sajja_vamsi/dotnet_app.zip -d /home/sajja_vamsi/app
+        unzip /home/vij1542044/dotnet_app.zip -d /home/vij1542044/app
 
         cat <<EOL | sudo tee /etc/systemd/system/myapp.service
         [Unit]
         Description=My .NET App
 
         [Service]
-        WorkingDirectory=/home/sajja_vamsi/app
-        ExecStart=/usr/bin/dotnet /home/sajja_vamsi/app/MyDotnetApp.dll
+        WorkingDirectory=/home/vij1542044/app
+        ExecStart=/usr/bin/dotnet /home/vij1542044/app/MyApp.dll
         Restart=always
         RestartSec=10
         SyslogIdentifier=mydotnetapp
-        User=sajja_vamsi
+        User=vij1542044
 
         [Install]
         WantedBy=multi-user.target
@@ -50,7 +50,7 @@ steps:
 
         chmod +x startup.sh
 
-  # Step 3: Create a GCE VM
+  # Step 3: Create VM with metadata placeholder (actual script will be copied later)
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'Create VM'
     args:
@@ -66,8 +66,8 @@ steps:
       - --tags=http-server
       - --metadata=startup-script='#!/bin/bash'
       - --scopes=https://www.googleapis.com/auth/cloud-platform
-      - --service-account=1064351983714-compute@developer.gserviceaccount.com
-      - --project=enhub-cloud-interns
+      - --service-account=880653953247-compute@developer.gserviceaccount.com
+      - --project=onyx-antler-459216-j6
 
   # Step 4: Copy ZIP and startup script to VM
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -77,20 +77,20 @@ steps:
       - scp
       - dotnet_app.zip
       - startup.sh
-      - sajja_vamsi@my-vm-instance:/home/sajja_vamsi
+      - vij1542044@my-vm-instance:/home/vij1542044
       - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
+      - --project=onyx-antler-459216-j6
 
-  # Step 5: SSH into VM and run the startup script
+  # Step 5: SSH into VM and execute the startup script
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'Run startup script on VM'
     args:
       - compute
       - ssh
-      - sajja_vamsi@my-vm-instance
+      - vij1542044@my-vm-instance
       - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
-      - --command=bash /home/sajja_vamsi/startup.sh
+      - --project=onyx-antler-459216-j6
+      - --command=bash /home/vij1542044/startup.sh
 
 options:
   logging: CLOUD_LOGGING_ONLY
