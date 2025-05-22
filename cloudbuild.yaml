@@ -1,0 +1,96 @@
+steps:
+  # Step 1: Install .NET SDK & publish app
+  - name: 'mcr.microsoft.com/dotnet/sdk:7.0'
+    id: 'Publish .NET App'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p output
+        dotnet publish MyApp.csproj -c Release -o output
+        zip -r dotnet_app.zip output
+
+  # Step 2: Create startup script to unzip and run the app
+  - name: 'ubuntu'
+    id: 'Generate startup script'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cat << 'EOF' > startup.sh
+        #!/bin/bash
+        set -e
+
+        sudo apt-get update
+        sudo apt-get install -y unzip dotnet-runtime-7.0
+
+        unzip /home/sajja_vamsi/dotnet_app.zip -d /home/sajja_vamsi/app
+
+        cat <<EOL | sudo tee /etc/systemd/system/myapp.service
+        [Unit]
+        Description=My .NET App
+
+        [Service]
+        WorkingDirectory=/home/sajja_vamsi/app
+        ExecStart=/usr/bin/dotnet /home/sajja_vamsi/app/MyDotnetApp.dll
+        Restart=always
+        RestartSec=10
+        SyslogIdentifier=mydotnetapp
+        User=sajja_vamsi
+
+        [Install]
+        WantedBy=multi-user.target
+        EOL
+
+        sudo systemctl daemon-reexec
+        sudo systemctl daemon-reload
+        sudo systemctl enable myapp.service
+        sudo systemctl start myapp.service
+        EOF
+
+        chmod +x startup.sh
+
+  # Step 3: Create a GCE VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Create VM'
+    args:
+      - compute
+      - instances
+      - create
+      - my-vm-instance
+      - --zone=asia-east1-b
+      - --machine-type=e2-micro
+      - --image-family=debian-11
+      - --image-project=debian-cloud
+      - --boot-disk-size=10GB
+      - --tags=http-server
+      - --metadata=startup-script='#!/bin/bash'
+      - --scopes=https://www.googleapis.com/auth/cloud-platform
+      - --service-account=1064351983714-compute@developer.gserviceaccount.com
+      - --project=enhub-cloud-interns
+
+  # Step 4: Copy ZIP and startup script to VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Copy files to VM'
+    args:
+      - compute
+      - scp
+      - dotnet_app.zip
+      - startup.sh
+      - sajja_vamsi@my-vm-instance:/home/sajja_vamsi
+      - --zone=asia-east1-b
+      - --project=enhub-cloud-interns
+
+  # Step 5: SSH into VM and run the startup script
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Run startup script on VM'
+    args:
+      - compute
+      - ssh
+      - sajja_vamsi@my-vm-instance
+      - --zone=asia-east1-b
+      - --project=enhub-cloud-interns
+      - --command=bash /home/sajja_vamsi/startup.sh
+
+options:
+  logging: CLOUD_LOGGING_ONLY
